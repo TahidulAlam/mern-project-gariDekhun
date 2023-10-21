@@ -1,7 +1,7 @@
+require("dotenv").config();
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
-require("dotenv").config();
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -10,7 +10,6 @@ app.use(cors());
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rclqpat.mongodb.net/?retryWrites=true&w=majority`;
-
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -21,7 +20,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const slider_image = client.db("brand").collection("slider_image");
     const GariDekhunDbNew = client
       .db("GariDekhunDbNew")
@@ -32,7 +31,19 @@ async function run() {
     const cartProducts = client
       .db("GariDekhunDbNew")
       .collection("garikinunCarts");
+    const banner = client.db("brand").collection("banner");
+    const userRegistrationDb = client.db("brand").collection("registration");
 
+    app.get("/banner", async (req, res) => {
+      try {
+        const cursor = banner.find();
+        const result = await cursor.toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
     app.get("/home/slider", async (req, res) => {
       try {
         const cursor = slider_image.find();
@@ -86,10 +97,12 @@ async function run() {
 
     app.get("/allproducts/details/:id", async (req, res) => {
       const id = req.params.id;
+      console.log(id);
       const query = { _id: new ObjectId(id) };
       const result = await allproducts.findOne(query);
       res.send(result);
     });
+
     app.get("/allproducts/update/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -120,7 +133,7 @@ async function run() {
           option
         );
         if (result.modifiedCount > 0) {
-          res.status(200).json({ message: "Product updated successfully" });
+          res.send(result);
         } else {
           res.status(404).json({ message: "Product not found" });
         }
@@ -172,13 +185,45 @@ async function run() {
         res.status(500).send("Internal Server Error");
       }
     });
-    app.delete("/cart/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await cartProducts.deleteOne(query);
-      res.send(result);
+    app.get("/cart/:uuid", async (req, res) => {
+      const uuid = req.params.uuid;
+      try {
+        const cursor = cartProducts.find({ uuid: uuid });
+        const result = await cursor.toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+      }
     });
-    await client.db("admin").command({ ping: 1 });
+    app.delete("/cart/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        console.log(id);
+        const query = { _id: new ObjectId(id) };
+        const result = await cartProducts.deleteOne(query);
+
+        if (result.deletedCount === 1) {
+          res.send({ success: true });
+        } else {
+          res.status(404).send({ error: "Document not found" });
+        }
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        res.status(500).send({ error: "Internal server error" });
+      }
+    });
+
+    app.post("/users", async (req, res) => {
+      try {
+        const userData = req.body;
+        const result = await userRegistrationDb.insertOne(userData);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
